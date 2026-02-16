@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmer AI Assistant</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="AI-powered farming assistant for crop advice, weather, and more">
+    <meta name="theme-color" content="#2ecc71">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Farmer AI">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .header h1 {
+            color: white;
+            font-size: 28px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .header p {
+            color: rgba(255,255,255,0.9);
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .language-toggle {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .lang-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .lang-btn.active {
+            background: white;
+            color: #27ae60;
+            border-color: white;
+        }
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .chat-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+        }
+        .message {
+            max-width: 75%;
+            padding: 14px 18px;
+            border-radius: 20px;
+            word-wrap: break-word;
+            animation: slideIn 0.3s ease-out;
+            line-height: 1.5;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        @keyframes slideIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(15px) scale(0.95);
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1);
+            }
+        }
+        .user-message {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            align-self: flex-end;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        .agent-message {
+            background: white;
+            align-self: flex-start;
+            color: #2d3748;
+            border-bottom-left-radius: 5px;
+        }
+        .input-container {
+            background: white;
+            padding: 20px;
+            display: flex;
+            gap: 12px;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+        }
+        #userInput {
+            flex: 1;
+            padding: 16px 24px;
+            border: 2px solid #e2e8f0;
+            border-radius: 30px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s;
+        }
+        #userInput:focus {
+            border-color: #2ecc71;
+            box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.1);
+        }
+        .send-btn {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 30px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(46, 204, 113, 0.3);
+        }
+        .send-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+        }
+        .send-btn:active {
+            transform: translateY(0);
+        }
+        .typing-indicator {
+            display: none;
+            align-self: flex-start;
+            background: white;
+            padding: 14px 18px;
+            border-radius: 20px;
+            border-bottom-left-radius: 5px;
+        }
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background: #27ae60;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: bounce 1.4s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌾 Farmer AI Assistant</h1>
+        <p id="subtitle">Ask me anything about farming, crops, weather, soil, pests & more</p>
+        <div class="language-toggle">
+            <button class="lang-btn active" onclick="setLanguage('en')" id="btn-en">English</button>
+            <button class="lang-btn" onclick="setLanguage('mr')" id="btn-mr">मराठी</button>
+        </div>
+    </div>
+    
+    <div class="chat-container" id="chatContainer">
+        <div class="message agent-message" id="welcomeMsg">
+            👋 Hello! I'm your farming assistant. Ask me anything about crops, weather, soil health, pest control, irrigation, or farming tips!
+        </div>
+    </div>
+    
+    <div class="typing-indicator" id="typingIndicator">
+        <span></span><span></span><span></span>
+    </div>
+    
+    <div class="input-container">
+        <input type="text" id="userInput" placeholder="Ask me anything about farming..." onkeypress="handleKeyPress(event)">
+        <button class="send-btn" onclick="sendMessage()" id="sendBtn">Send</button>
+    </div>
+
+    <script>
+        const sessionId = 'session_' + Date.now();
+        let currentLanguage = 'en';
+
+        const translations = {
+            en: {
+                subtitle: 'Ask me anything about farming, crops, weather, soil, pests & more',
+                welcome: '👋 Hello! I\'m your farming assistant. Ask me anything about crops, weather, soil health, pest control, irrigation, or farming tips!',
+                placeholder: 'Ask me anything about farming...',
+                sendBtn: 'Send'
+            },
+            mr: {
+                subtitle: 'शेती, पिके, हवामान, माती, किडे आणि अधिक बद्दल मला काहीही विचारा',
+                welcome: '👋 नमस्कार! मी तुमचा शेती सहाय्यक आहे. पिके, हवामान, माती आरोग्य, किडे नियंत्रण, सिंचन किंवा शेती टिप्स बद्दल मला काहीही विचारा!',
+                placeholder: 'शेतीबद्दल काहीही विचारा...',
+                sendBtn: 'पाठवा'
+            }
+        };
+
+        function setLanguage(lang) {
+            currentLanguage = lang;
+            
+            // Update UI
+            document.getElementById('subtitle').textContent = translations[lang].subtitle;
+            document.getElementById('userInput').placeholder = translations[lang].placeholder;
+            document.getElementById('sendBtn').textContent = translations[lang].sendBtn;
+            
+            // Update buttons
+            document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+            document.getElementById('btn-mr').classList.toggle('active', lang === 'mr');
+            
+            // Clear and show new welcome message
+            const container = document.getElementById('chatContainer');
+            container.innerHTML = '';
+            const welcomeDiv = document.createElement('div');
+            welcomeDiv.className = 'message agent-message';
+            welcomeDiv.textContent = translations[lang].welcome;
+            container.appendChild(welcomeDiv);
+        }
+
+        function addMessage(text, isUser) {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'agent-message'}`;
+            messageDiv.textContent = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showTyping(show) {
+            const indicator = document.getElementById('typingIndicator');
+            indicator.style.display = show ? 'flex' : 'none';
+            if (show) {
+                const chatContainer = document.getElementById('chatContainer');
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            addMessage(message, true);
+            input.value = '';
+            showTyping(true);
+            
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: message,
+                        session_id: sessionId,
+                        language: currentLanguage
+                    })
+                });
+                
+                const data = await response.json();
+                showTyping(false);
+                addMessage(data.response, false);
+            } catch (error) {
+                showTyping(false);
+                addMessage('Sorry, I encountered an error. Please try again.', false);
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/service-worker.js')
+                .then(() => console.log('Service Worker registered'))
+                .catch(err => console.log('Service Worker registration failed', err));
+        }
+    </script>
+</body>
+</html>
