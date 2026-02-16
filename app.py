@@ -1,19 +1,22 @@
 from flask import Flask, render_template, request, jsonify
-from groq import Groq
 import os
 from dotenv import load_dotenv
 import requests
+from openai import OpenAI
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# Configure Groq API only
+# Configure OpenAI (using Groq's OpenAI-compatible API)
 GROQ_KEY = os.environ.get('GROQ_API_KEY')
 if GROQ_KEY:
-    groq_client = Groq(api_key=GROQ_KEY)
+    client = OpenAI(
+        api_key=GROQ_KEY,
+        base_url="https://api.groq.com/openai/v1"
+    )
 else:
-    groq_client = None
+    client = None
 
 class FarmerAgent:
     def __init__(self):
@@ -81,7 +84,7 @@ PRIVACY & SECURITY:
         return "I can help with: weather forecasts, crop selection, soil health, pest control, irrigation, fertilizers, and profit tips. What would you like to know?"
     
     def get_response(self, user_message, session_id='default'):
-        if not groq_client:
+        if not client:
             return "🤖 (Offline Mode) " + self.get_offline_response(user_message)
         
         # Check if asking about weather
@@ -110,7 +113,7 @@ PRIVACY & SECURITY:
                 {"role": "user", "content": user_message}
             ]
             
-            response = groq_client.chat.completions.create(
+            response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
                 temperature=0.7,
