@@ -90,17 +90,25 @@ PRIVACY & SECURITY:
         
         # Check if asking about weather
         msg_lower = user_message.lower()
-        weather_keywords = ['weather', 'temperature', 'wind', 'rain', 'humidity', 'forecast', 'hava', 'तापमान']
+        weather_keywords = ['weather', 'temperature', 'wind', 'rain', 'humidity', 'forecast', 'hava', 'तापमान', 'हवामान']
+        
+        # Extract city name and get weather data
+        weather_data = None
         if any(keyword in msg_lower for keyword in weather_keywords):
-            # Try to extract city name
             cities = ['pune', 'mumbai', 'delhi', 'bangalore', 'hyderabad', 'chennai', 'kolkata', 'ahmedabad', 'nagpur', 'nashik', 'पुणे', 'मुंबई']
             for city in cities:
                 if city in msg_lower:
                     city_name = city.replace('पुणे', 'pune').replace('मुंबई', 'mumbai')
                     weather_data = self.get_weather(city_name)
-                    if weather_data:
-                        user_message = f"{user_message}\n\n[WEATHER DATA - Use this to answer: {weather_data}]"
                     break
+            
+            # If no city found but weather keyword present, ask for city
+            if not weather_data:
+                return "Please specify which city you want weather information for. For example: 'What is the weather in Pune?'"
+        
+        # Add weather data to message if available
+        if weather_data:
+            user_message = f"{user_message}\n\n[WEATHER DATA - Use this exact data to answer: {weather_data}]"
         
         try:
             # Get chat history
