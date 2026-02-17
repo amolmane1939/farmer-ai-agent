@@ -276,3 +276,33 @@ body {
         --text-light: #d1d5db;
     }
 }
+
+/* Stop Button */
+.stop-btn {
+    background: #ef4444;
+    color: var(--white);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.2s;
+    margin: 0 auto 0.75rem auto;
+    max-width: 1200px;
+}
+
+.stop-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+}
+
+.stop-btn:active {
+    transform: translateY(0);
+}

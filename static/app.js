@@ -2,6 +2,7 @@
 
 const sessionId = 'session_' + Date.now();
 let currentLanguage = 'en';
+let abortController = null;  // For stopping requests
 
 const translations = {
     en: {
@@ -83,7 +84,9 @@ function addMessage(text, isUser) {
 
 function showTyping(show) {
     const indicator = document.getElementById('typingIndicator');
+    const stopBtn = document.getElementById('stopBtn');
     indicator.style.display = show ? 'flex' : 'none';
+    stopBtn.style.display = show ? 'flex' : 'none';
     
     if (show) {
         const chatContainer = document.getElementById('chatContainer');
@@ -91,6 +94,15 @@ function showTyping(show) {
             top: chatContainer.scrollHeight,
             behavior: 'smooth'
         });
+    }
+}
+
+function stopGeneration() {
+    if (abortController) {
+        abortController.abort();
+        abortController = null;
+        showTyping(false);
+        addMessage('Response stopped.', false);
     }
 }
 
@@ -105,8 +117,11 @@ async function sendMessage() {
     input.value = '';
     input.style.height = 'auto';
     
-    // Show typing indicator
+    // Show typing indicator and stop button
     showTyping(true);
+    
+    // Create new abort controller
+    abortController = new AbortController();
     
     try {
         const response = await fetch('/chat', {
@@ -116,7 +131,8 @@ async function sendMessage() {
                 message: message,
                 session_id: sessionId,
                 language: currentLanguage
-            })
+            }),
+            signal: abortController.signal
         });
         
         if (!response.ok) {
@@ -128,8 +144,14 @@ async function sendMessage() {
         addMessage(data.response, false);
     } catch (error) {
         showTyping(false);
+        if (error.name === 'AbortError') {
+            // Request was aborted by user
+            return;
+        }
         addMessage('Sorry, I encountered an error. Please try again.', false);
         console.error('Error:', error);
+    } finally {
+        abortController = null;
     }
     
     focusInput();

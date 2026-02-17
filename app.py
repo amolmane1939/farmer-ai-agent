@@ -3,175 +3,113 @@ import os
 from dotenv import load_dotenv
 import requests
 from openai import OpenAI
+from db_manager import KnowledgeDB
 
 load_dotenv()
-
 app = Flask(__name__)
 
-# Configure OpenAI (using Groq's OpenAI-compatible API)
 GROQ_KEY = os.environ.get('GROQ_API_KEY')
-if GROQ_KEY:
-    client = OpenAI(
-        api_key=GROQ_KEY,
-        base_url="https://api.groq.com/openai/v1"
-    )
-else:
-    client = None
+client = OpenAI(api_key=GROQ_KEY, base_url="https://api.groq.com/openai/v1") if GROQ_KEY else None
 
 class FarmerAgent:
     def __init__(self):
-        self.system_prompt = """
-You are a helpful farming assistant with access to real-time weather data.
-
-IMPORTANT RULES:
-- For SIMPLE questions (greetings, yes/no, weather): Give SHORT answers (1-2 sentences)
-- For COMPLEX questions (how to, planning, advice, problems): Give DETAILED answers in STEP-BY-STEP format
-- When weather data is provided in [WEATHER DATA] brackets, YOU MUST USE THAT EXACT DATA
-- Include ALL details from the weather data: temperature, feels like, humidity, wind speed and direction
-- Don't make up weather information - only use what's provided
-- Use simple, clear language
-- Be direct and accurate
-
-FORMATTING FOR COMPLEX ANSWERS:
-- Use numbered steps (1., 2., 3., etc.)
-- Each step should be clear and actionable
-- Add brief explanation after each step if needed
-- Use line breaks between steps for readability
-- Example format:
-  1. First step - brief explanation
-  2. Second step - brief explanation
-  3. Third step - brief explanation
-
-COMPLEX QUESTIONS that need step-by-step answers:
-- Crop planning, plantation, cultivation (use numbered steps)
-- Soil improvement, fertilizer application (use numbered steps)
-- Pest/disease management (use numbered steps)
-- Irrigation planning (use numbered steps)
-- Profit improvement strategies (use numbered steps)
-- Problem-solving questions (use numbered steps)
-
-SIMPLE QUESTIONS that need short answers:
-- Greetings (hello, hi, namaste)
-- Weather queries
-- Yes/No questions
-- Single fact questions
-
-PRIVACY & SECURITY:
-- NEVER ask for personal information like phone numbers, addresses, bank details
-- NEVER store or remember sensitive personal data
-- Focus only on farming advice
-"""
+        try:
+            self.knowledge_db = KnowledgeDB()
+        except:
+            self.knowledge_db = None
         self.chat_sessions = {}
-        
-        # Offline knowledge base
-        self.offline_knowledge = {
-            "weather": "Check local weather apps like IMD or Meghdoot for accurate forecasts. Plan your irrigation and sowing based on rainfall predictions.",
-            "pune weather": "Pune is in monsoon season with temperatures 28-32°C. Expect moderate rainfall. Good time for Kharif crops like soybean, rice, and maize.",
-            "crop": "Popular crops: Rice (monsoon), Wheat (winter), Soybean (Kharif), Cotton (warm weather), Sugarcane (year-round with irrigation).",
-            "which crop": "Choose based on: 1) Season (Kharif/Rabi), 2) Soil type, 3) Water availability, 4) Market demand. Tell me your season and I'll suggest specific crops.",
-            "soil": "Improve soil: Use organic compost, practice crop rotation, test pH regularly, add green manure, avoid excessive chemicals.",
-            "pest": "Pest control: Use neem spray, check crops daily, remove infected plants early, try IPM (Integrated Pest Management), encourage natural predators.",
-            "profit": "Increase profit: Sell directly at mandis, join farmer cooperatives, reduce input costs with organic methods, try value-added products.",
-            "drought": "Drought management: Use drip irrigation, mulch soil to retain moisture, plant drought-resistant varieties, harvest rainwater.",
-            "fertilizer": "Use balanced NPK based on soil test. Organic options: compost, vermicompost, green manure. Apply before rain for better absorption.",
-            "irrigation": "Efficient irrigation: Drip system saves 40% water, sprinkler for large fields, check soil moisture before watering."
-        }
     
     def get_weather(self, city):
-        """Get real-time weather data using free API"""
         try:
-            # Using wttr.in - free, no API key needed
-            url = f"https://wttr.in/{city}?format=j1"
-            response = requests.get(url, timeout=5)
+            response = requests.get(f"https://wttr.in/{city}?format=j1", timeout=5)
             if response.status_code == 200:
-                data = response.json()
-                current = data['current_condition'][0]
-                temp = current['temp_C']
-                feels_like = current['FeelsLikeC']
-                humidity = current['humidity']
-                wind_speed = current['windspeedKmph']
-                wind_dir = current['winddir16Point']
-                weather_desc = current['weatherDesc'][0]['value']
-                
-                return f"Current weather in {city}: {weather_desc}, Temperature: {temp}°C (feels like {feels_like}°C), Humidity: {humidity}%, Wind: {wind_speed} km/h {wind_dir}"
-            return None
+                data = response.json()['current_condition'][0]
+                return f"{data['weatherDesc'][0]['value']}, {data['temp_C']}°C, Humidity {data['humidity']}%, Wind {data['windspeedKmph']} km/h"
         except:
-            return None
+            pass
+        return None
     
-    def get_offline_response(self, message):
-        msg_lower = message.lower()
+    def get_response(self, user_message, session_id='default', language='en'):
+        msg_lower = user_message.lower().strip()
         
-        for keyword, response in self.offline_knowledge.items():
-            if keyword in msg_lower:
-                return response
+        # Greetings
+        if msg_lower in ['hi', 'hello', 'hey', 'namaste', 'hi!', 'hello!']:
+            return "Namaste! I'm your farming assistant. Ask me about crops, soil, pests, water, or profit. How can I help you today?"
         
-        return "I can help with: weather forecasts, crop selection, soil health, pest control, irrigation, fertilizers, and profit tips. What would you like to know?"
-    
-    def get_response(self, user_message, session_id='default'):
-        if not client:
-            return "🤖 (Offline Mode) " + self.get_offline_response(user_message)
+        # Search knowledge database - use top 2 results
+        db_context = ""
+        if self.knowledge_db:
+            results = self.knowledge_db.search(user_message, top_k=2)
+            if results:  # Always use if found
+                # Combine top results
+                for result in results[:2]:
+                    db_context += f"\n\n[Expert Knowledge: {result['answer']}]"
         
-        # Check if asking about weather
-        msg_lower = user_message.lower()
-        weather_keywords = ['weather', 'temperature', 'wind', 'rain', 'humidity', 'forecast', 'hava', 'तापमान', 'हवामान']
-        
-        # Extract city name and get weather data
-        weather_data = None
-        if any(keyword in msg_lower for keyword in weather_keywords):
-            cities = ['pune', 'mumbai', 'delhi', 'bangalore', 'hyderabad', 'chennai', 'kolkata', 'ahmedabad', 'nagpur', 'nashik', 'पुणे', 'मुंबई']
-            for city in cities:
+        # Weather check
+        weather_info = ""
+        if any(w in msg_lower for w in ['weather', 'temperature', 'rain', 'hava', 'mausam']):
+            for city in ['pune', 'mumbai', 'delhi', 'bangalore', 'hyderabad', 'chennai', 'nagpur', 'nashik']:
                 if city in msg_lower:
-                    city_name = city.replace('पुणे', 'pune').replace('मुंबई', 'mumbai')
-                    weather_data = self.get_weather(city_name)
+                    weather_data = self.get_weather(city)
+                    if weather_data:
+                        weather_info = f"\n\n[Current Weather in {city.title()}: {weather_data}]"
                     break
-            
-            # If no city found but weather keyword present, ask for city
-            if not weather_data:
-                return "Please specify which city you want weather information for. For example: 'What is the weather in Pune?'"
         
-        # Add weather data to message if available
-        if weather_data:
-            user_message = f"{user_message}\n\n[WEATHER DATA - Use this exact data to answer: {weather_data}]"
+        if not client:
+            return "Service temporarily unavailable. Please try again."
+        
+        # Enhanced system prompt for farmers
+        system_prompt = """You are an expert farming advisor helping Indian farmers. 
+
+CRITICAL INSTRUCTION:
+If [Expert Knowledge] is provided below, YOU MUST USE ONLY THAT INFORMATION.
+Do NOT add information from your general knowledge.
+Present the expert knowledge in simple, conversational language.
+
+RULES:
+1. Use SIMPLE language farmers understand
+2. Give PRACTICAL advice with real numbers
+3. Mention Indian context (mandis, schemes, seasons)
+4. For complex topics, use numbered steps
+5. For simple questions, 2-3 sentences
+6. Be encouraging and supportive
+
+If [Current Weather] is provided, use that exact data.
+
+Remember: Farmers need clear, actionable advice."""
+        
+        # Build full context
+        full_context = user_message + weather_info + db_context
         
         try:
-            # Get chat history
             if session_id not in self.chat_sessions:
                 self.chat_sessions[session_id] = []
             
-            history = self.chat_sessions[session_id]
-            messages = [
-                {"role": "system", "content": self.system_prompt},
-                *history,
-                {"role": "user", "content": user_message}
-            ]
+            # Keep last 3 exchanges for context
+            history = self.chat_sessions[session_id][-6:]
             
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
-                messages=messages,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    *history,
+                    {"role": "user", "content": full_context}
+                ],
                 temperature=0.7,
-                max_tokens=300,  # Increased for detailed answers
+                max_tokens=1000
             )
             
             answer = response.choices[0].message.content
             
-            # Update history
-            history.append({"role": "user", "content": user_message})
-            history.append({"role": "assistant", "content": answer})
+            # Update history with original message (not full context)
+            self.chat_sessions[session_id].append({"role": "user", "content": user_message})
+            self.chat_sessions[session_id].append({"role": "assistant", "content": answer})
             
             return answer
         except Exception as e:
-            return "🤖 (Offline Mode) " + self.get_offline_response(user_message)
+            return "Sorry, I'm having trouble right now. Please ask your question again."
 
 agent = FarmerAgent()
-
-# Fallback offline responses
-OFFLINE_TIPS = {
-    "climate": "For drought: Use drip irrigation, mulch soil. For floods: Ensure drainage, use raised beds.",
-    "soil": "Practice crop rotation, use organic compost, get soil tested regularly.",
-    "pest": "Use Integrated Pest Management (IPM), neem pesticides, monitor crops regularly.",
-    "profit": "Diversify crops, reduce input costs, explore direct-to-consumer sales.",
-    "infrastructure": "Join farmer cooperatives for shared storage, check government subsidies."
-}
 
 @app.route('/')
 def home():
@@ -183,11 +121,10 @@ def chat():
     session_id = request.json.get('session_id', 'default')
     language = request.json.get('language', 'en')
     
-    # Add language instruction to message
     if language == 'mr':
-        user_message = f"[Respond in Marathi language] {user_message}"
+        user_message = f"[IMPORTANT: Respond in Marathi language] {user_message}"
     
-    response = agent.get_response(user_message, session_id)
+    response = agent.get_response(user_message, session_id, language)
     return jsonify({'response': response})
 
 if __name__ == '__main__':
