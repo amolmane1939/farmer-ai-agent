@@ -62,7 +62,14 @@ function addMessage(text, isUser) {
     const chatContainer = document.getElementById('chatContainer');
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user-message' : 'agent-message'}`;
-    messageDiv.textContent = text;
+    
+    // Format text with line breaks and preserve formatting
+    const formattedText = text
+        .replace(/\n/g, '<br>')  // Convert newlines to <br>
+        .replace(/(\d+\.\s)/g, '<br>$1')  // Add line break before numbered steps
+        .replace(/^<br>/, '');  // Remove leading <br> if any
+    
+    messageDiv.innerHTML = formattedText;
     chatContainer.appendChild(messageDiv);
     
     // Smooth scroll to bottom
