@@ -1,3 +1,5 @@
+---
+
 What We Built
 Added SQLite FTS5 (Full-Text Search) database to store and search farming knowledge offline.
 
