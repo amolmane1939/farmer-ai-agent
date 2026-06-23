@@ -188,3 +188,5 @@ Database file: farming_knowledge.db
 Backup regularly
 Can delete and recreate anytime
 Portable (copy to other systems)
+
+---
