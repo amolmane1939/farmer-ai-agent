@@ -9,7 +9,6 @@ class KnowledgeDB:
     def __init__(self, db_path="farming_knowledge.db"):
         """Initialize SQLite database with FTS5."""
         self.db_path = db_path
-        # Use a thread-safe connection with WAL mode for concurrent reads
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.cursor = self.conn.cursor()
@@ -57,18 +56,23 @@ class KnowledgeDB:
             'was', 'were', 'how', 'what', 'when', 'where', 'why'
         }
         words = text.lower().split()
-        keywords = [w.strip('.,?!') for w in words
-                    if w.strip('.,?!') not in common_words and len(w) > 3]
+        keywords = [w.strip('.,!') for w in words
+                    if w.strip('.,!') not in common_words and len(w) > 3]
         return ' '.join(keywords[:20])
 
     def search(self, query, top_k=2):
         """Search for relevant knowledge using FTS5."""
         try:
-            # Sanitize query: escape special FTS5 characters
+            # Sanitize: only strip characters that break FTS5 syntax
+            # Keep '?' as it is harmless in OR-joined terms
             sanitized = query.translate(
-                str.maketrans('', '', '"\' *()[]{}^~:')
+                str.maketrans('', '', '"\'^*()[]{}~:')
             )
-            query_clean = ' OR '.join(sanitized.lower().split())
+            # Build OR query from individual words
+            words = [w.strip() for w in sanitized.lower().split() if w.strip()]
+            if not words:
+                return []
+            query_clean = ' OR '.join(words)
 
             self.cursor.execute(
                 """SELECT category, question, answer, rank
