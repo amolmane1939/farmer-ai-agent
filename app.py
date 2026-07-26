@@ -17,15 +17,17 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Rate limiting — 30 requests/minute per IP
+# Rate limiting - 30 requests/minute per IP
+# storage_uri='memory://' explicitly suppresses the default in-memory warning
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["30 per minute"]
+    default_limits=["30 per minute"],
+    storage_uri="memory://"
 )
 
 def get_groq_client():
-    """Lazy initialization of Groq client — re-reads key each time."""
+    """Lazy initialization of Groq client - re-reads key each time."""
     key = os.environ.get('GROQ_API_KEY')
     if not key:
         return None
@@ -62,7 +64,7 @@ class FarmerAgent:
     def get_response(self, user_message, session_id='default', language='en'):
         msg_lower = user_message.lower().strip()
 
-        # Greetings — keyword-based (more flexible than exact match)
+        # Greetings - keyword-based (more flexible than exact match)
         greeting_words = ['hi', 'hello', 'hey', 'namaste']
         if any(msg_lower.startswith(w) for w in greeting_words):
             return "Namaste! I'm your farming assistant. Ask me about crops, soil, pests, water, or profit. How can I help you today?"
@@ -94,7 +96,7 @@ class FarmerAgent:
         if not client:
             return "Service temporarily unavailable. Please try again."
 
-        # Language instruction goes in the system prompt — not in user message
+        # Language instruction goes in system prompt - not in user message
         language_instruction = ""
         if language == 'mr':
             language_instruction = "\nIMPORTANT: Always respond in Marathi language."
@@ -140,7 +142,6 @@ Remember: Farmers need clear, actionable advice.{language_instruction}"""
 
             answer = response.choices[0].message.content
 
-            # Store only original message in history
             self.chat_sessions[session_id].append({"role": "user", "content": user_message})
             self.chat_sessions[session_id].append({"role": "assistant", "content": answer})
 
@@ -174,7 +175,7 @@ def chat():
     if language not in ('en', 'mr'):
         language = 'en'
 
-    # Generate session ID server-side — never trust client-provided IDs
+    # Generate session ID server-side - never trust client-provided IDs
     session_id = data.get('session_id', '')
     if not session_id or not _is_valid_session_id(session_id):
         session_id = str(uuid.uuid4())
@@ -192,6 +193,8 @@ def _is_valid_session_id(sid):
         return False
 
 
+# PythonAnywhere uses WSGI - do NOT call app.run() in production
+# This block is only for local development
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
