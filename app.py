@@ -2,12 +2,12 @@ from flask import Flask, render_template, request, jsonify
 import os
 import uuid
 import logging
+import time
+from collections import defaultdict
 from dotenv import load_dotenv
 import requests
 from openai import OpenAI
 from db_manager import KnowledgeDB
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 
 load_dotenv()
 
@@ -17,14 +17,24 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Rate limiting - 30 requests/minute per IP
-# storage_uri='memory://' explicitly suppresses the default in-memory warning
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["30 per minute"],
-    storage_uri="memory://"
-)
+# ---------------------------------------------------------------------------
+# Simple in-process rate limiter (no external dependency)
+# Tracks request timestamps per IP; max 30 requests per 60-second window
+# ---------------------------------------------------------------------------
+_rate_store = defaultdict(list)
+RATE_LIMIT = 30
+RATE_WINDOW = 60  # seconds
+
+def is_rate_limited(ip):
+    now = time.time()
+    window_start = now - RATE_WINDOW
+    # Keep only timestamps inside the current window
+    _rate_store[ip] = [t for t in _rate_store[ip] if t > window_start]
+    if len(_rate_store[ip]) >= RATE_LIMIT:
+        return True
+    _rate_store[ip].append(now)
+    return False
+
 
 def get_groq_client():
     """Lazy initialization of Groq client - re-reads key each time."""
@@ -96,7 +106,7 @@ class FarmerAgent:
         if not client:
             return "Service temporarily unavailable. Please try again."
 
-        # Language instruction goes in system prompt - not in user message
+        # Language instruction in system prompt - not in user message
         language_instruction = ""
         if language == 'mr':
             language_instruction = "\nIMPORTANT: Always respond in Marathi language."
@@ -161,8 +171,12 @@ def home():
 
 
 @app.route('/chat', methods=['POST'])
-@limiter.limit("30 per minute")
 def chat():
+    # Rate limiting - 30 requests per minute per IP
+    client_ip = request.remote_addr or 'unknown'
+    if is_rate_limited(client_ip):
+        return jsonify({'error': 'Too many requests. Please wait a moment.'}), 429
+
     data = request.json or {}
     user_message = data.get('message', '').strip()
     language = data.get('language', 'en')
@@ -193,8 +207,7 @@ def _is_valid_session_id(sid):
         return False
 
 
-# PythonAnywhere uses WSGI - do NOT call app.run() in production
-# This block is only for local development
+# PythonAnywhere uses WSGI - do NOT run app.run() in production
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
