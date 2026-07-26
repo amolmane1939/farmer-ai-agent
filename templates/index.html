@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Farmer AI Assistant</title>
-    
+
     <!-- PWA Meta Tags -->
     <meta name="description" content="AI-powered farming assistant for crop advice, weather, and more">
     <meta name="theme-color" content="#10b981">
@@ -13,50 +13,77 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Farmer AI">
-    
+
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127806;</text></svg>">
+
     <!-- Styles -->
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="header">
         <div class="header-content">
-            <h1>🌾 Farmer AI Assistant</h1>
-            <p id="subtitle">Your smart farming companion - Ask about crops, weather, soil & more</p>
-            
+            <div class="header-top">
+                <h1>&#127806; Farmer AI Assistant</h1>
+                <button class="clear-btn" onclick="clearChat()" title="Clear chat">&#128465; Clear</button>
+            </div>
+            <p id="subtitle">Your smart farming companion - Ask about crops, weather, soil &amp; more</p>
+
             <div class="language-toggle">
                 <button class="lang-btn active" onclick="setLanguage('en')" id="btn-en">English</button>
-                <button class="lang-btn" onclick="setLanguage('mr')" id="btn-mr">मराठी</button>
+                <button class="lang-btn" onclick="setLanguage('mr')" id="btn-mr">&#2350;&#2352;&#2366;&#2336;&#2368;</button>
             </div>
         </div>
     </div>
-    
-    <div class="chat-container" id="chatContainer">
-        <div class="message agent-message">
-            👋 Hello! I'm your farming assistant. Ask me anything about crops, weather, soil health, pest control, irrigation, or farming tips!
+
+    <div class="chat-wrapper">
+        <div class="chat-container" id="chatContainer">
+            <!-- Empty state -->
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">&#127806;</div>
+                <p id="emptyStateText">Ask me anything about your farm!</p>
+            </div>
         </div>
+
+        <!-- Scroll to bottom button -->
+        <button class="scroll-btn" id="scrollBtn" onclick="scrollToBottom()" title="Scroll to latest">&#8595; New message</button>
     </div>
-    
-    <div class="typing-indicator" id="typingIndicator">
-        <span></span><span></span><span></span>
-    </div>
-    
+
     <div class="input-container">
+        <!-- Suggestion chips -->
+        <div class="suggestions" id="suggestions">
+            <button class="chip" onclick="sendChip(this)">&#127807; Best crops for monsoon</button>
+            <button class="chip" onclick="sendChip(this)">&#128027; Pest control tips</button>
+            <button class="chip" onclick="sendChip(this)">&#128167; Irrigation advice</button>
+            <button class="chip" onclick="sendChip(this)">&#127777;&#65039; Weather in Pune</button>
+            <button class="chip" onclick="sendChip(this)">&#128176; Crop prices today</button>
+            <button class="chip" onclick="sendChip(this)">&#127807; Soil health tips</button>
+        </div>
+
         <button class="stop-btn" id="stopBtn" onclick="stopGeneration()" style="display: none;">
-            ⏹ Stop Generating
+            &#9209; Stop Generating
         </button>
+
         <div class="input-wrapper">
-            <input 
-                type="text" 
-                id="userInput" 
-                placeholder="Type your question here..." 
-                autocomplete="off"
-                aria-label="Type your message"
-            >
-            <button class="send-btn" id="sendBtn" aria-label="Send message">Send</button>
+            <div class="textarea-wrapper">
+                <textarea
+                    id="userInput"
+                    placeholder="Type your question here..."
+                    autocomplete="off"
+                    aria-label="Type your message"
+                    rows="1"
+                    maxlength="1000"
+                ></textarea>
+                <span class="char-counter" id="charCounter">0 / 1000</span>
+            </div>
+            <button class="send-btn" id="sendBtn" aria-label="Send message">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
         </div>
     </div>
 
-    <!-- JavaScript -->
     <script src="/static/app.js"></script>
 </body>
 </html>
